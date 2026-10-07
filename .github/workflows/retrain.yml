@@ -1,0 +1,48 @@
+name: weekly-retrain
+
+# Retrainer agent: every Sunday, run a deeper champion-vs-challenger search
+# than the live 5-minute loop performs. A passing challenger is logged as a
+# candidate for the live Accuracy agent to verify and adopt; this job never
+# modifies the live champion itself.
+on:
+  schedule:
+    - cron: "0 6 * * 0"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-log-writer
+  cancel-in-progress: false
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Deep challenger search
+        id: search
+        run: |
+          node scripts/weekly-retrain.js > retrain_out.json
+          cat retrain_out.json
+          echo "rec=$(cat retrain_out.json)" >> "$GITHUB_OUTPUT"
+      - name: Append to agent log
+        run: |
+          git config --global user.name "retrainer-bot"
+          git config --global user.email "noreply@github.com"
+          mkdir -p data
+          cat retrain_out.json >> data/agent_log.jsonl
+          git add data/agent_log.jsonl
+          git diff --cached --quiet || git commit -m "retrainer: weekly deep search"
+          git pull --rebase origin main || true
+          git push origin main
+      - name: Keep scheduled workflows enabled
+        run: |
+          LAST=$(git log -1 --format=%ct)
+          if [ $(( $(date +%s) - LAST )) -gt $(( 50*86400 )) ]; then
+            git commit --allow-empty -m "chore: keep scheduled workflows active" && git push origin main || true
+          fi

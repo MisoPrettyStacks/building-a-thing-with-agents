@@ -28,7 +28,7 @@
 </header>
 
 <nav class="toc">
-  <a href="#live">Live</a><a href="#score">Live accuracy</a><a href="#backtest">Backtest</a><a href="#agent">Agent</a>
+  <a href="#live">Live</a><a href="#score">Live accuracy</a><a href="#backtest">Backtest</a><a href="#agent">Agent</a><a href="#agents">Agents</a>
   <a href="#method">Methodology</a><a href="#integrity">Integrity &amp; source</a><a href="#refs">References</a>
 </nav>
 
@@ -108,6 +108,20 @@
       <div class="log" id="agentLog"><div class="muted">No decisions logged yet.</div></div>
     </div>
   </div>
+</section>
+
+<section id="agents" class="card">
+  <h2>Agents</h2>
+  <p class="muted" style="margin-top:0">Four autonomous loops run this system around the clock. Each acts on its own schedule and logs every decision below — nothing happens silently. The <a href="#agent">Accuracy agent</a> above is the statistical core; these four are the operational crew.</p>
+  <div class="grid g4" style="margin-top:10px">
+    <div class="stat"><div class="k">Forecaster</div><div class="v" id="h4_fc">—</div><div class="s" id="h4_fc_t"></div></div>
+    <div class="stat"><div class="k">Scorer</div><div class="v" id="h4_sc">—</div><div class="s" id="h4_sc_t"></div></div>
+    <div class="stat"><div class="k">Retrainer</div><div class="v" id="h4_rt">—</div><div class="s" id="h4_rt_t"></div></div>
+    <div class="stat"><div class="k">Researcher</div><div class="v" id="h4_rs">—</div><div class="s" id="h4_rs_t"></div></div>
+  </div>
+  <h3 style="margin-top:14px">Agent decisions <span class="muted" style="font-weight:400;font-size:13px">(newest first)</span></h3>
+  <div class="log" id="agentLog4"><div class="empty">Loading agent log…</div></div>
+  <p class="muted" style="font-size:12px;margin-top:8px">Full log: <a id="agentLogLink" href="#">data/agent_log.jsonl</a></p>
 </section>
 
 <section id="method" class="card method">

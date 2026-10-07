@@ -1,0 +1,58 @@
+name: score-ledger
+
+# Scorer agent: every 15 minutes, verify the forecast ledger is healthy —
+# summary.json fresh, hash chain intact — and log the verdict to the agent log.
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-log-writer
+  cancel-in-progress: false
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check data branch health
+        id: health
+        run: |
+          REPO="${{ github.repository }}"
+          SUM=$(curl -fsSL --max-time 30 "https://raw.githubusercontent.com/$REPO/data/summary.json" 2>/dev/null || echo "")
+          if [ -z "$SUM" ]; then
+            echo "status=missing" >> "$GITHUB_OUTPUT"
+            echo "detail=summary.json not reachable on data branch" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          GEN=$(echo "$SUM" | python3 -c "import json,sys; print(json.load(sys.stdin).get('generated_at',''))" 2>/dev/null || echo "")
+          NOW=$(date -u +%s)
+          GEN_EPOCH=$(date -u -d "$GEN" +%s 2>/dev/null || echo 0)
+          AGE_MIN=$(( (NOW - GEN_EPOCH) / 60 ))
+          CHAIN_OK=$(echo "$SUM" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('health',{}).get('ledger',{}).get('ok', False))" 2>/dev/null || echo "False")
+          N_FORECASTS=$(echo "$SUM" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('counts',{}).get('forecasts', 0))" 2>/dev/null || echo 0)
+          if [ "$AGE_MIN" -lt 30 ] && [ "$CHAIN_OK" = "True" ]; then
+            echo "status=healthy" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=degraded" >> "$GITHUB_OUTPUT"
+          fi
+          echo "detail=summary ${AGE_MIN}m old, chain_ok=${CHAIN_OK}, forecasts=${N_FORECASTS}" >> "$GITHUB_OUTPUT"
+      - name: Append to agent log
+        run: |
+          git config --global user.name "scorer-bot"
+          git config --global user.email "noreply@github.com"
+          git clone --depth 1 "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" repo
+          cd repo
+          mkdir -p data
+          TS=$(date -u +%FT%T+00:00)
+          STATUS="${{ steps.health.outputs.status }}"
+          DETAIL="${{ steps.health.outputs.detail }}"
+          if [ "$STATUS" = "healthy" ]; then TAG="info"; DEC="ledger healthy"; else TAG="alarm"; DEC="ledger degraded"; fi
+          printf '%s\n' "{\"ts\": \"$TS\", \"agent\": \"scorer\", \"decision\": \"$DEC\", \"detail\": \"$DETAIL\", \"tag\": \"$TAG\"}" >> data/agent_log.jsonl
+          git add data/agent_log.jsonl
+          git diff --cached --quiet || git commit -m "scorer: $DEC"
+          git pull --rebase origin main || true
+          git push origin main

@@ -507,6 +507,52 @@ async function downloadZip() {
   btn.disabled = false;
 }
 
+/* ---------------- 4-agent operational dashboard ---------------- */
+const AGENT_TAG_CLASS = { adopt: 'up', reject: 'muted', recover: 'warn', alarm: 'down', info: 'muted' };
+async function loadAgents4() {
+  const logEl = $('agentLog4');
+  if (!logEl) return;
+  try {
+    const base = RAW_MAIN || './';
+    const link = $('agentLogLink');
+    if (link) link.href = base + 'data/agent_log.jsonl';
+    const lines = (await (await fetch(base + 'data/agent_log.jsonl?t=' + Date.now(), { cache: 'no-store' })).text()).trim().split('\n').filter(Boolean);
+    const evs = lines.map((l) => JSON.parse(l)).reverse();
+    logEl.innerHTML = '';
+    evs.slice(0, 30).forEach((e) => {
+      const d = document.createElement('div');
+      const t = e.ts ? new Date(e.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+      const tagCls = AGENT_TAG_CLASS[e.tag] || 'muted';
+      d.innerHTML = `<span class="t">${esc(t)}</span><span class="tag ${esc(e.tag || '')}">${esc(e.agent || '')}</span>` +
+        `<span class="${tagCls}">${esc(e.decision || '')}</span><br><span class="muted" style="font-size:12px">${esc(e.detail || '')}</span>`;
+      logEl.appendChild(d);
+    });
+    // health from latest events + live data
+    const last = {};
+    evs.forEach((e) => { if (e.agent && !last[e.agent]) last[e.agent] = e.ts; });
+    const ago = (ts) => {
+      if (!ts) return '—';
+      const m = Math.round((Date.now() - new Date(ts).getTime()) / 60000);
+      return m < 1 ? 'just now' : m < 60 ? m + 'm ago' : Math.round(m / 60) + 'h ago';
+    };
+    const set = (id, txt, sub, ok) => {
+      const e = $(id); if (!e) return;
+      e.textContent = txt; e.className = 'v ' + (ok === false ? 'warn' : ok === true ? 'up' : '');
+      const s = $(id + '_t'); if (s) s.textContent = sub || '';
+    };
+    try {
+      const sj = await (await fetch(DATA_BASE + 'summary.json?m=' + Math.floor(Date.now() / 60000), { cache: 'no-store' })).json();
+      const genAge = sj.generated_at ? (Date.now() - new Date(sj.generated_at).getTime()) / 60000 : 999;
+      set('h4_fc', genAge < 15 ? '● live' : '● stale', 'forecast ' + ago(sj.generated_at), genAge < 15);
+    } catch { set('h4_fc', '● ?', '', null); }
+    set('h4_sc', last.scorer ? '● live' : '● armed', last.scorer ? 'last run ' + ago(last.scorer) : 'runs every 15 min', !!last.scorer);
+    set('h4_rt', last.retrainer ? '● armed' : '● armed', last.retrainer ? 'last run ' + ago(last.retrainer) : 'runs Sundays', true);
+    set('h4_rs', last.researcher ? '● armed' : '● armed', last.researcher ? 'last scan ' + ago(last.researcher) : 'runs Mondays', true);
+  } catch {
+    logEl.innerHTML = '<div class="empty">Agent log unavailable.</div>';
+  }
+}
+
 /* ---------------- boot ---------------- */
 document.querySelectorAll('#winTabs button').forEach((b) => b.addEventListener('click', () => renderScore(b.dataset.w)));
 $('dl').addEventListener('click', downloadZip);
@@ -525,10 +571,12 @@ window.addEventListener('load', () => {
   loadCandles(); connectWS();
   await loadSummary();
   runBacktest();
+  loadAgents4();
   tickCountdown();
   setInterval(tickCountdown, 1000);
   setInterval(pollTicker, 5000);
   setInterval(loadCandles, 60000);
   setInterval(loadSummary, 60000);
+  setInterval(loadAgents4, 300000);
   setInterval(schedDraw, 5000);
 })();

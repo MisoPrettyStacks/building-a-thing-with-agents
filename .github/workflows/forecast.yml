@@ -40,6 +40,19 @@ jobs:
         run: node scripts/runner.js --data ./data-branch --minutes 305 --push
         env:
           GITHUB_SHA: ${{ github.sha }}
+      - name: Log forecaster heartbeat
+        run: |
+          git config --global user.name "forecaster-bot"
+          git config --global user.email "noreply@github.com"
+          git clone --depth 1 "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" repo-main
+          cd repo-main
+          mkdir -p data
+          TS=$(date -u +%FT%T+00:00)
+          printf '%s\n' "{\"ts\": \"$TS\", \"agent\": \"forecaster\", \"decision\": \"forecast loop completed\", \"detail\": \"5h runner finished: issued 15-minute probabilities every 5 minutes from closed Coinbase bars.\", \"tag\": \"info\"}" >> data/agent_log.jsonl
+          git add data/agent_log.jsonl
+          git diff --cached --quiet || git commit -m "forecaster: loop heartbeat"
+          git pull --rebase origin main || true
+          git push origin main || true
       - name: Keep scheduled workflows enabled
         run: |
           git fetch origin main --depth 1 -q || exit 0

@@ -1,0 +1,40 @@
+name: weekly-research
+
+# Researcher agent: every Monday, scan arXiv (q-fin and related) for new work
+# on short-horizon crypto predictability. Promising ideas are logged as
+# candidates for backtesting; only winners survive. Read-only: never touches
+# model parameters.
+on:
+  schedule:
+    - cron: "53 16 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-log-writer
+  cancel-in-progress: false
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Literature scan
+        run: |
+          node scripts/weekly-research.js > research_out.json
+          cat research_out.json
+      - name: Append to agent log
+        run: |
+          git config --global user.name "researcher-bot"
+          git config --global user.email "noreply@github.com"
+          mkdir -p data
+          cat research_out.json >> data/agent_log.jsonl
+          git add data/agent_log.jsonl
+          git diff --cached --quiet || git commit -m "researcher: weekly literature scan"
+          git pull --rebase origin main || true
+          git push origin main
