@@ -9,3 +9,4 @@
 {"ts": "2026-10-08T09:05:09+00:00", "agent": "forecaster", "decision": "forecast loop completed", "detail": "5h runner finished: issued 15-minute probabilities every 5 minutes from closed Coinbase bars.", "tag": "info"}
 {"ts": "2026-10-08T15:31:16+00:00", "agent": "scorer", "decision": "ledger healthy", "detail": "summary 1m old, chain_ok=True, forecasts=169", "tag": "info"}
 {"ts": "2026-10-08T16:45:09+00:00", "agent": "forecaster", "decision": "forecast loop completed", "detail": "5h runner finished: issued 15-minute probabilities every 5 minutes from closed Coinbase bars.", "tag": "info"}
+{"ts": "2026-10-08T20:47:30+00:00", "agent": "scorer", "decision": "ledger healthy", "detail": "summary 2m old, chain_ok=True, forecasts=189", "tag": "info"}
